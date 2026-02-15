@@ -103,11 +103,11 @@ async def main():
                 snippet = snippet[:MAX_SNIPPET] + "…"
 
             teks = (
-                f"🚨 ALERT: {matched}\n"
+                f"🚨🚨 CEK GRUP SO : {group_name}\n"
+                f"Keyword: {matched}\n"
                 f"Waktu: {waktu}\n"
-                f"Grup asal: {group_name}\n"
                 f"Dari: {sender_name}\n\n"
-                f"Pesan (ringkas):\n{snippet}"
+                f"Pesan: \n{snippet}"
             )
 
             # Kirim alert ke grup monitoring
@@ -125,3 +125,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
