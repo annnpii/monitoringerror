@@ -1,9 +1,18 @@
 import asyncio
+import threading
+from flask import Flask
 from datetime import datetime, timedelta
 
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.errors import FloodWaitError
+
+@app.get("/")
+def home():
+    return "Telegram monitor alive"
+def run_web():
+    app.run(host="0.0.0.0", port=3000)
+threading.Thread(target=run_web, daemon=True).start()
 
 # ====== ISI INI ======
 api_id = 32737298  # GANTI
@@ -105,3 +114,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
