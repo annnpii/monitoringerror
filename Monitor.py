@@ -17,7 +17,7 @@ api_hash = os.environ["TELEGRAM_API_HASH"]
 string_session = os.environ["TELEGRAM_STRING_SESSION"]
 
 # Grup khusus untuk kumpulin alert
-TARGET = "@errorgais"
+TARGET = "@errorgaiss"
 
 # Keyword yang dipantau
 KEYWORDS = [
@@ -125,4 +125,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
