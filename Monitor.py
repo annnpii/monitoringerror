@@ -1,36 +1,32 @@
 import os
-import re
 import json
 import asyncio
-from flask import Flask
 from threading import Thread
+from flask import Flask
 from telethon import TelegramClient, events
 
 # ==============================
-# CONFIG (ISI DI SECRETS REPLIT)
+# CONFIG (ISI DI REPLIT SECRETS)
 # ==============================
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-
 SESSION_NAME = "session"
 
-# ==============================
-# EXCLUDED GROUP
-# ==============================
 EXCLUDED_GROUP = "Project & IT Support BSS"
+DATA_FILE = "data.json"
 
 # ==============================
-# DATA FILE
+# DEFAULT DATA
 # ==============================
-DATA_FILE = "data.json"
+default_data = {
+    "keywords": ["error", "teknisi", "down", "offline"],
+    "monitoring": True,
+    "forward_to": None
+}
 
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {
-            "keywords": ["error", "down", "offline"],
-            "monitoring": True,
-            "forward_to": None
-        }
+        return default_data
     with open(DATA_FILE, "r") as f:
         return json.load(f)
 
@@ -60,10 +56,18 @@ Thread(target=run_web).start()
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 
 # ==============================
-# MONITORING MESSAGE
+# DEBUG MONITOR
 # ==============================
-@client.on(events.NewMessage)
+@client.on(events.NewMessage(outgoing=True))
+async def debug_log(event):
+    print("Outgoing detected:", event.raw_text)
+
+# ==============================
+# MONITORING
+# ==============================
+@client.on(events.NewMessage(incoming=True))
 async def monitor_handler(event):
+
     if not data["monitoring"]:
         return
 
@@ -73,14 +77,14 @@ async def monitor_handler(event):
     chat = await event.get_chat()
     group_name = (getattr(chat, "title", "") or "").lower()
 
-    # Skip excluded group
     if EXCLUDED_GROUP.lower() in group_name:
         return
 
-    message_text = event.raw_text.lower()
+    text = event.raw_text.lower()
 
     for word in data["keywords"]:
-        if word.lower() in message_text:
+        if word.lower() in text:
+            print(f"Keyword detected: {word}")
             if data["forward_to"]:
                 await client.forward_messages(
                     data["forward_to"],
@@ -89,9 +93,14 @@ async def monitor_handler(event):
             break
 
 # ==============================
-# COMMAND HANDLER
+# COMMANDS (USERBOT)
 # ==============================
-@client.on(events.NewMessage(pattern=r"\.help"))
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.ping"))
+async def ping_cmd(event):
+    await event.reply("Pong 🏓")
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.help"))
 async def help_cmd(event):
     await event.reply("""
 🔥 COMMAND LIST 🔥
@@ -101,21 +110,19 @@ async def help_cmd(event):
 .del <keyword>
 .list
 .clear
-.setforward (balas pesan dari grup tujuan)
+.setforward (reply pesan target)
 .stopforward
 .status
-.test
-.ping
 """)
 
-@client.on(events.NewMessage(pattern=r"\.monitor (on|off)"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.monitor (on|off)"))
 async def monitor_cmd(event):
     state = event.pattern_match.group(1)
     data["monitoring"] = True if state == "on" else False
     save_data(data)
     await event.reply(f"Monitoring {state.upper()}")
 
-@client.on(events.NewMessage(pattern=r"\.add (.+)"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.add (.+)"))
 async def add_cmd(event):
     word = event.pattern_match.group(1)
     if word not in data["keywords"]:
@@ -123,7 +130,7 @@ async def add_cmd(event):
         save_data(data)
     await event.reply(f"Keyword ditambahkan: {word}")
 
-@client.on(events.NewMessage(pattern=r"\.del (.+)"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.del (.+)"))
 async def del_cmd(event):
     word = event.pattern_match.group(1)
     if word in data["keywords"]:
@@ -131,21 +138,20 @@ async def del_cmd(event):
         save_data(data)
     await event.reply(f"Keyword dihapus: {word}")
 
-@client.on(events.NewMessage(pattern=r"\.list"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.list"))
 async def list_cmd(event):
-    words = "\n".join(data["keywords"])
-    await event.reply(f"Keyword aktif:\n{words}")
+    await event.reply("Keyword aktif:\n" + "\n".join(data["keywords"]))
 
-@client.on(events.NewMessage(pattern=r"\.clear"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.clear"))
 async def clear_cmd(event):
     data["keywords"] = []
     save_data(data)
     await event.reply("Semua keyword dihapus.")
 
-@client.on(events.NewMessage(pattern=r"\.setforward"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.setforward"))
 async def set_forward(event):
     if not event.is_reply:
-        await event.reply("Balas pesan dari grup tujuan.")
+        await event.reply("Reply pesan dari grup tujuan.")
         return
 
     replied = await event.get_reply_message()
@@ -153,40 +159,29 @@ async def set_forward(event):
     save_data(data)
     await event.reply("Grup tujuan diset.")
 
-@client.on(events.NewMessage(pattern=r"\.stopforward"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.stopforward"))
 async def stop_forward(event):
     data["forward_to"] = None
     save_data(data)
     await event.reply("Forward dimatikan.")
 
-@client.on(events.NewMessage(pattern=r"\.status"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"\.status"))
 async def status_cmd(event):
     await event.reply(f"""
-Status Monitoring: {data['monitoring']}
-Keyword Count: {len(data['keywords'])}
+Monitoring: {data['monitoring']}
+Keyword: {len(data['keywords'])}
 Forward Active: {data['forward_to'] is not None}
-Excluded Group: {EXCLUDED_GROUP}
+Excluded: {EXCLUDED_GROUP}
 """)
 
-@client.on(events.NewMessage(pattern=r"\.test"))
-async def test_cmd(event):
-    await event.reply("Bot aktif dan normal.")
-
-@client.on(events.NewMessage(pattern=r"\.ping"))
-async def ping_cmd(event):
-    await event.reply("Pong 🏓")
-
 # ==============================
-# AUTO RECONNECT LOOP
+# MAIN LOOP
 # ==============================
 async def main():
     await client.start()
-    print("Bot Running...")
-    while True:
-        try:
-            await client.run_until_disconnected()
-        except Exception as e:
-            print("Reconnect error:", e)
-            await asyncio.sleep(5)
+    print("Telegram Connected")
+    me = await client.get_me()
+    print("Login sebagai:", me.username)
+    await client.run_until_disconnected()
 
 asyncio.run(main())
